@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -1754,6 +1755,8 @@ private:
             DrawRoundedRect(x,ry,w,43.0f,7.0f,COL_PANEL_CARD,COL_PANEL_BORDER);
             DrawText(x+10.0f,ry+5.0f,c.name?c.name:"Unnamed",13.0f,COL_WHITE);
             if(c.detail && c.detail[0]) DrawText(x+10.0f,ry+23.0f,c.detail,9.5f,COL_MUTED);
+            const size_t choiceCount=LauncherCheats::Choices(idx);
+            if(choiceCount>0) { const std::string value=LauncherCheats::ValueLabel(idx); DrawText(x+w-210.0f,ry+15.0f,value.c_str(),10.0f,COL_CYAN); DrawText(x+w-255.0f,ry+15.0f,"<",12.0f,COL_WHITE); DrawText(x+w-125.0f,ry+15.0f,">",12.0f,COL_WHITE); }
             bool on=LauncherCheats::Enabled(idx); float bx=x+w-78.0f;
             DrawRoundedRect(bx,ry+6.0f,68.0f,30.0f,6.0f,on?COL_ACTIVE_CHIP:COL_INACTIVE_CHIP,on?COL_CYAN:COL_CHIP_BORDER);
             DrawText(bx+34.0f,ry+14.0f,on?"ON":"OFF",12.0f,on?COL_ACTIVE_TEXT:COL_WHITE,true);
@@ -1869,7 +1872,7 @@ private:
             if(py>=contentY && py<=contentY+48.0f) { if(px>=x+contentW-116.0f && px<x+contentW-70.0f) m_cheatGroupIndex=(m_cheatGroupIndex+int(groups.size())-1)%int(groups.size()); else if(px>=x+contentW-60.0f && px<x+contentW-14.0f) m_cheatGroupIndex=(m_cheatGroupIndex+1)%int(groups.size()); m_cheatPage=0; return; }
             std::string_view group(groups[size_t(m_cheatGroupIndex)]); std::vector<size_t> ids; for(size_t i=0;i<cheats.size();++i) if(cheats[i].group && group==cheats[i].group) ids.push_back(i);
             int pages=std::max(1,int((ids.size()+4)/5));
-            for(int row=0;row<5;++row) { size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break; float ry=contentY+56.0f+float(row)*48.0f; if(py>=ry && py<=ry+43.0f && px>=x+contentW-86.0f) { size_t idx=ids[pos]; LauncherCheats::Enable(idx,!LauncherCheats::Enabled(idx)); return; } }
+            for(int row=0;row<5;++row) { size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break; float ry=contentY+56.0f+float(row)*48.0f; if(py>=ry && py<=ry+43.0f) { size_t idx=ids[pos]; if(px>=x+contentW-86.0f) { LauncherCheats::Enable(idx,!LauncherCheats::Enabled(idx)); return; } size_t count=LauncherCheats::Choices(idx); if(count>0 && px>=x+contentW-265.0f && px<x+contentW-105.0f) { size_t selected=LauncherCheats::Selected(idx); selected=px<x+contentW-185.0f?(selected+count-1)%count:(selected+1)%count; LauncherCheats::Select(idx,selected); return; } } }
             if(py>=contentY+292.0f && py<=contentY+326.0f) { if(px>=x+contentW-116.0f && px<x+contentW-66.0f) m_cheatPage=(m_cheatPage+pages-1)%pages; else if(px>=x+contentW-58.0f && px<x+contentW-8.0f) m_cheatPage=(m_cheatPage+1)%pages; } return;
         }
         if (m_menuTab == 0) { // Gráficos
