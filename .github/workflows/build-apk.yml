@@ -71,7 +71,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OceanTriRecomp-Android-v1.5.5-test-arm64
+          name: OceanTriRecomp-CheatsTest-v1.5.6-arm64
           path: release/OceanTriRecomp-Android-v1.5.5-test-arm64.apk
           if-no-files-found: error
 
@@ -80,7 +80,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v1.5.5-test
-          name: "OceanTriRecomp Android v1.5.5 Test (Telemetry Logger)"
+          name: "Monster Hunter Tri Cheats Test v1.5.6"
           body: |
             ## OceanTriRecomp Android v1.5.5-test 🦖📱
 
