@@ -1,4 +1,4 @@
-name: Build Android APK (v1.5.5-test)
+name: Build Android APK (Native Cheats Test)
 
 on:
   push:
