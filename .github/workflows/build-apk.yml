@@ -1,4 +1,5 @@
 name: Build Android APK (Native Cheats Test)
+run-name: Native cheats APK test — ${{ github.event_name }}
 
 on:
   push:
