@@ -61,7 +61,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     private static final String TAG = "SDL";
     private static final int SDL_MAJOR_VERSION = 3;
     private static final int SDL_MINOR_VERSION = 4;
-    private static final int SDL_MICRO_VERSION = 16;
+    private static final int SDL_MICRO_VERSION = 4;
 /*
     // Display InputType.SOURCE/CLASS of events and devices
     //
@@ -256,9 +256,9 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         String function = SDLActivity.mSingleton.getMainFunction();
         String[] arguments = SDLActivity.mSingleton.getArguments();
 
-        Log.i("SDL", "Running main function " + function + " from library " + library);
-        int res = SDLActivity.nativeRunMain(library, function, arguments);
-        Log.i("SDL", "Finished main function, exit code = " + res);
+        Log.v("SDL", "Running main function " + function + " from library " + library);
+        SDLActivity.nativeRunMain(library, function, arguments);
+        Log.v("SDL", "Finished main function");
     }
 
     /**
@@ -347,14 +347,23 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         Log.v(TAG, "Manufacturer: " + Build.MANUFACTURER);
         Log.v(TAG, "Device: " + Build.DEVICE);
         Log.v(TAG, "Model: " + Build.MODEL);
-        Log.i(TAG, "onCreate() - mSDLMainFinished=" + mSDLMainFinished + " mActivityCreated=" + mActivityCreated);
+        Log.v(TAG, "onCreate()");
         super.onCreate(savedInstanceState);
 
-        if (mSDLMainFinished) {
-            Log.i(TAG, "SDL main() already finished. Resetting state for relaunch.");
-            mSDLMainFinished = false;
-            mActivityCreated = false;
-            mSDLThread = null;
+
+        /* Control activity re-creation */
+        if (mSDLMainFinished || mActivityCreated) {
+              boolean allow_recreate = SDLActivity.nativeAllowRecreateActivity();
+              if (mSDLMainFinished) {
+                  Log.v(TAG, "SDL main() finished");
+              }
+              if (allow_recreate) {
+                  Log.v(TAG, "activity re-created");
+              } else {
+                  Log.v(TAG, "activity finished");
+                  System.exit(0);
+                  return;
+              }
         }
 
         mActivityCreated = true;
@@ -414,9 +423,21 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         }
 
 
+        /* Control activity re-creation */
+        /* Robustness: check that the native code is run for the first time.
+         * (Maybe Activity was reset, but not the native code.) */
         {
-            int run_count = SDLActivity.nativeCheckSDLThreadCounter();
-            Log.i(TAG, "SDL native thread counter: " + run_count);
+            int run_count = SDLActivity.nativeCheckSDLThreadCounter(); /* get and increment a native counter */
+            if (run_count != 0) {
+                boolean allow_recreate = SDLActivity.nativeAllowRecreateActivity();
+                if (allow_recreate) {
+                    Log.v(TAG, "activity re-created // run_count: " + run_count);
+                } else {
+                    Log.v(TAG, "activity finished // run_count: " + run_count);
+                    System.exit(0);
+                    return;
+                }
+            }
         }
 
         // Set up JNI
@@ -509,8 +530,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
 
         if (mHIDDeviceManager != null) {
             mHIDDeviceManager.setFrozen(true);
-        }        
-
+        }
         if (!mHasMultiWindow) {
             pauseNativeThread();
         }
@@ -523,8 +543,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
 
         if (mHIDDeviceManager != null) {
             mHIDDeviceManager.setFrozen(false);
-        }        
-
+        }
         if (!mHasMultiWindow) {
             resumeNativeThread();
         }
@@ -551,7 +570,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     public static int getNaturalOrientation() {
         int result = SDL_ORIENTATION_UNKNOWN;
 
-        Activity activity = getContext();
+        Activity activity = (Activity)getContext();
         if (activity != null) {
             Configuration config = activity.getResources().getConfiguration();
             Display display = activity.getWindowManager().getDefaultDisplay();
@@ -571,7 +590,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     public static int getCurrentRotation() {
         int result = 0;
 
-        Activity activity = getContext();
+        Activity activity = (Activity)getContext();
         if (activity != null) {
             Display display = activity.getWindowManager().getDefaultDisplay();
             switch (display.getRotation()) {
@@ -596,14 +615,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         Log.v(TAG, "onWindowFocusChanged(): " + hasFocus);
-
-        // If we are gaining focus, we can always try to restore our USB devices. If we are losing focus,
-        // only try to relinquish them if we don't have background events allowed (for multi-window Android setups).
-        if (hasFocus || !SDLActivity.nativeGetHintBoolean("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", false)) {
-            if (mHIDDeviceManager != null) {
-                mHIDDeviceManager.setFrozen(!hasFocus);
-            }            
-        }
 
         if (SDLActivity.mBrokenLibraries) {
            return;
@@ -1281,7 +1292,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     public static double getDiagonal()
     {
         DisplayMetrics metrics = new DisplayMetrics();
-        Activity activity = getContext();
+        Activity activity = (Activity)getContext();
         if (activity == null) {
             return 0.0;
         }
@@ -1470,11 +1481,11 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         if (SDLControllerManager.isDeviceSDLJoystick(deviceId)) {
             // Note that we process events with specific key codes here
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (SDLControllerManager.onNativePadDown(deviceId, keyCode, event.getScanCode())) {
+                if (SDLControllerManager.onNativePadDown(deviceId, keyCode)) {
                     return true;
                 }
             } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                if (SDLControllerManager.onNativePadUp(deviceId, keyCode, event.getScanCode())) {
+                if (SDLControllerManager.onNativePadUp(deviceId, keyCode)) {
                     return true;
                 }
             }
@@ -1929,7 +1940,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             return;
         }
 
-        Activity activity = getContext();
+        Activity activity = (Activity)getContext();
         if (activity.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
             activity.requestPermissions(new String[]{permission}, requestCode);
         } else {
@@ -1952,7 +1963,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             Intent i = new Intent(Intent.ACTION_VIEW);
             i.setData(Uri.parse(url));
 
-            int flags = Intent.FLAG_ACTIVITY_NO_HISTORY
+            int flags = Intent.FLAG_ACTIVITY_NO_HISTORY 
                       | Intent.FLAG_ACTIVITY_MULTIPLE_TASK
                       | Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
             i.addFlags(flags);
