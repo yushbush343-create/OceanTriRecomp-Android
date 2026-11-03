@@ -2739,7 +2739,7 @@ private:
     float m_buttonOpacity = 1.0f;
     int m_gearAutoHideSec = 0;
     std::atomic<int64_t> m_lastTouchMs{0};
-    int m_menuLang = 0;        // 0: Español (default), 1: English
+    int m_menuLang = 1;        // 0: Español, 1: English (default)
     int m_langChoice = 0;      // 0: Español
     double m_liveFps = 60.0;
     std::string m_saveStatusMsg = "Listo para exportar o importar partidas guardadas.";
