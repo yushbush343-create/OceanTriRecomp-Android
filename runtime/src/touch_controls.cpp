@@ -10,6 +10,7 @@
 #include "net/lan_beacon.h"
 #include "recomp_mod_loader.h"
 #include "efb_host.h"
+#include "launcher_cheats.h"
 
 #include <SDL3/SDL.h>
 #include <GLES3/gl3.h>
@@ -1186,8 +1187,8 @@ private:
         }
 
         // Header Title & Subtitle (Larger readable fonts)
-        const char* titles_es[] = { "Gráficos", "Sistema", "Guardados", "Controles", "Online" };
-        const char* titles_en[] = { "Graphics", "System", "Saves", "Controls", "Online" };
+        const char* titles_es[] = { "Gráficos", "Sistema", "Guardados", "Controles", "Online", "Trucos" };
+        const char* titles_en[] = { "Graphics", "System", "Saves", "Controls", "Online", "Cheats" };
         const char* const* titles = (m_menuLang == 1) ? titles_en : titles_es;
 
         const char* subtitles_es[] = {
@@ -1195,14 +1196,16 @@ private:
             "Idioma del menú, juego y reinicio",
             "Gestor de partidas Dolphin / Wii NAND",
             "Visibilidad en pantalla, mando gamepad y macros",
-            "Multijugador local, ZeroTier y servidores comunitarios"
+            "Multijugador local, ZeroTier y servidores comunitarios",
+            "Lista de trucos del juego"
         };
         const char* subtitles_en[] = {
             "Display, resolution and presentation",
             "Menu language, game language and restart",
             "Dolphin / Wii NAND save file manager",
             "On-screen controls, gamepad and macros",
-            "Multiplayer, ZeroTier and community servers"
+            "Multiplayer, ZeroTier and community servers",
+            "Built-in game cheats and options"
         };
         const char* const* subtitles = (m_menuLang == 1) ? subtitles_en : subtitles_es;
         DrawText(padX + 24.0f, padY + 16.0f, titles[m_menuTab], 28.0f, COL_WHITE);
@@ -1229,9 +1232,9 @@ private:
 
         // Tab Navigation Bar
         float tabY = padY + 86.0f;
-        float tabW = (panW - 40.0f - 40.0f) / 5.0f;
+        float tabW = (panW - 40.0f - 50.0f) / 6.0f;
         float tabH = 44.0f;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 6; ++i) {
             float tx = padX + 20.0f + float(i) * (tabW + 10.0f);
             bool active = (m_menuTab == i);
             DrawRoundedRect(tx, tabY, tabW, tabH, 8.0f,
@@ -1250,6 +1253,7 @@ private:
         else if (m_menuTab == 2) RenderTabSaves(padX + 20.0f, contentY, contentW);
         else if (m_menuTab == 3) RenderTabControls(padX + 20.0f, contentY, contentW);
         else if (m_menuTab == 4) RenderTabOnline(padX + 20.0f, contentY, contentW);
+        else if (m_menuTab == 5) RenderTabCheats(padX + 20.0f, contentY, contentW);
     }
 
     void RenderTabGraphics(float x, float y, float w) {
@@ -1733,6 +1737,31 @@ private:
         DrawText(barX + 50.0f + bw * 4.5f, by + 9.0f, Tr("Cancelar", "Cancel"), 13.0f, COL_MUTED, true);
     }
 
+    void RenderTabCheats(float x,float y,float w) {
+        const auto groups=LauncherCheats::Groups(); const auto cheats=LauncherCheats::List();
+        if(groups.empty()) { DrawText(x+16.0f,y+20.0f,"No cheats available.",16.0f,COL_WHITE); return; }
+        m_cheatGroupIndex=std::clamp(m_cheatGroupIndex,0,int(groups.size())-1);
+        std::string_view group(groups[size_t(m_cheatGroupIndex)]); std::vector<size_t> ids;
+        for(size_t i=0;i<cheats.size();++i) if(cheats[i].group && group==cheats[i].group) ids.push_back(i);
+        int pages=std::max(1,int((ids.size()+4)/5)); m_cheatPage=std::clamp(m_cheatPage,0,pages-1);
+        DrawRoundedRect(x,y,w,48.0f,8.0f,COL_PANEL_CARD,COL_PANEL_BORDER);
+        DrawText(x+12.0f,y+14.0f,"CATEGORY",12.0f,COL_MUTED);
+        DrawText(x+105.0f,y+13.0f,group.data(),16.0f,COL_CYAN);
+        DrawText(x+w-92.0f,y+13.0f,"<     >",15.0f,COL_WHITE);
+        for(int row=0;row<5;++row) {
+            size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break;
+            size_t idx=ids[pos]; const auto& c=cheats[idx]; float ry=y+56.0f+float(row)*48.0f;
+            DrawRoundedRect(x,ry,w,43.0f,7.0f,COL_PANEL_CARD,COL_PANEL_BORDER);
+            DrawText(x+10.0f,ry+5.0f,c.name?c.name:"Unnamed",13.0f,COL_WHITE);
+            if(c.detail && c.detail[0]) DrawText(x+10.0f,ry+23.0f,c.detail,9.5f,COL_MUTED);
+            bool on=LauncherCheats::Enabled(idx); float bx=x+w-78.0f;
+            DrawRoundedRect(bx,ry+6.0f,68.0f,30.0f,6.0f,on?COL_ACTIVE_CHIP:COL_INACTIVE_CHIP,on?COL_CYAN:COL_CHIP_BORDER);
+            DrawText(bx+34.0f,ry+14.0f,on?"ON":"OFF",12.0f,on?COL_ACTIVE_TEXT:COL_WHITE,true);
+        }
+        char info[80]; std::snprintf(info,sizeof(info),"Enabled: %zu    Page %d/%d",LauncherCheats::EnabledCount(),m_cheatPage+1,pages);
+        DrawText(x+8.0f,y+304.0f,info,12.0f,COL_MUTED); DrawText(x+w-100.0f,y+304.0f,"<   >",16.0f,COL_WHITE);
+    }
+
     void RenderTabOnline(float x, float y, float w) {
         // Card 1: Modo de Conexión
         float c1H = 108.0f;
@@ -1814,10 +1843,10 @@ private:
 
         // Tabs
         float tabY = padY + 86.0f;
-        float tabW = (panW - 40.0f - 40.0f) / 5.0f;
+        float tabW = (panW - 40.0f - 50.0f) / 6.0f;
         float tabH = 44.0f;
         if (py >= tabY && py <= tabY + tabH) {
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 6; ++i) {
                 float tx = padX + 20.0f + float(i) * (tabW + 10.0f);
                 if (px >= tx && px <= tx + tabW) {
                     m_menuTab = i;
@@ -1834,6 +1863,15 @@ private:
         float contentW = panW - 40.0f;
         float x = padX + 20.0f;
 
+        if (m_menuTab == 5) {
+            const auto groups=LauncherCheats::Groups(); const auto cheats=LauncherCheats::List(); if(groups.empty()) return;
+            m_cheatGroupIndex=std::clamp(m_cheatGroupIndex,0,int(groups.size())-1);
+            if(py>=contentY && py<=contentY+48.0f) { if(px>=x+contentW-116.0f && px<x+contentW-70.0f) m_cheatGroupIndex=(m_cheatGroupIndex+int(groups.size())-1)%int(groups.size()); else if(px>=x+contentW-60.0f && px<x+contentW-14.0f) m_cheatGroupIndex=(m_cheatGroupIndex+1)%int(groups.size()); m_cheatPage=0; return; }
+            std::string_view group(groups[size_t(m_cheatGroupIndex)]); std::vector<size_t> ids; for(size_t i=0;i<cheats.size();++i) if(cheats[i].group && group==cheats[i].group) ids.push_back(i);
+            int pages=std::max(1,int((ids.size()+4)/5));
+            for(int row=0;row<5;++row) { size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break; float ry=contentY+56.0f+float(row)*48.0f; if(py>=ry && py<=ry+43.0f && px>=x+contentW-86.0f) { size_t idx=ids[pos]; LauncherCheats::Enable(idx,!LauncherCheats::Enabled(idx)); return; } }
+            if(py>=contentY+292.0f && py<=contentY+326.0f) { if(px>=x+contentW-116.0f && px<x+contentW-66.0f) m_cheatPage=(m_cheatPage+pages-1)%pages; else if(px>=x+contentW-58.0f && px<x+contentW-8.0f) m_cheatPage=(m_cheatPage+1)%pages; } return;
+        }
         if (m_menuTab == 0) { // Gráficos
             float chipH = 38.0f;
 
@@ -2683,6 +2721,8 @@ private:
     bool m_menuOpen = false;
     bool m_restarting = false;
     int m_menuTab = 0;
+    int m_cheatGroupIndex = 0;
+    int m_cheatPage = 0;
     int m_resolutionIndex = 0; // 0: Wii Original (1x)
     int m_aspectIndex = 0;     // 16:9 Panorámica (default)
     bool m_fullscreen = false;
