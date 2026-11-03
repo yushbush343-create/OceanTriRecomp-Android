@@ -76,9 +76,13 @@ if [ ! -f "${PNG_SO}" ]; then
     PNG_SO="$(find "${PROJECT_ROOT}/build-android" -name "libpng16.so" 2>/dev/null | head -n1)"
 fi
 cp "${PNG_SO}" "${BUILD_DIR}/apk_root/lib/arm64-v8a/libpng16.so"
-SDL3_SO="${PROJECT_ROOT}/packaging/android/libs/arm64-v8a/libSDL3.so"
-if [ ! -f "${SDL3_SO}" ] && [ -f "/var/mnt/juegos_sdb2/MHFU/out/release-android-mhfu/deps/sdl3-install/lib/libSDL3.so" ]; then
-    SDL3_SO="/var/mnt/juegos_sdb2/MHFU/out/release-android-mhfu/deps/sdl3-install/lib/libSDL3.so"
+SDL3_SO="${PROJECT_ROOT}/build-android/_deps/sdl-build/libSDL3.so"
+if [ ! -f "${SDL3_SO}" ]; then
+    SDL3_SO="$(find "${PROJECT_ROOT}/build-android" -path '*/_deps/sdl-build/libSDL3.so' -type f -print -quit)"
+fi
+if [ -z "${SDL3_SO}" ] || [ ! -f "${SDL3_SO}" ]; then
+    echo "ERROR: SDL3 shared library from this build was not found; refusing to package a stale SDL3 binary." >&2
+    exit 1
 fi
 cp "${SDL3_SO}" "${BUILD_DIR}/apk_root/lib/arm64-v8a/libSDL3.so"
 
