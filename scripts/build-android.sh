@@ -19,6 +19,7 @@ cmake -S "${ROOT_DIR}/runtime" -B "${BUILD_DIR}" -G Ninja \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
   -DCMAKE_BUILD_TYPE=Release \
+  -DAURORA_SDL3_LINKAGE=shared \
   -DMH3_AURORA_ROOT="${ROOT_DIR}/aurora-main"
 
 echo "=== 2. Building native libraries ==="
