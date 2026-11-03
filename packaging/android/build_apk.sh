@@ -101,7 +101,7 @@ if [ ! -f "${KEYSTORE}" ]; then
     keytool -genkeypair -v -keystore "${KEYSTORE}" -alias oceantri -keyalg RSA -keysize 2048 -validity 10000 \
         -storepass oceantrikey -keypass oceantrikey -dname "CN=OceanTri, OU=Gaming, O=Recomp, L=City, S=State, C=US"
 fi
-OUTPUT_APK="${BUILD_DIR}/OceanTriRecomp-Android-v1.5.5-test-arm64.apk"
+OUTPUT_APK="${BUILD_DIR}/OceanTriRecomp-CheatsTest-v1.5.6-arm64.apk"
 rm -f "${OUTPUT_APK}"
 "${SDK_BUILD_TOOLS}/apksigner" sign \
     --ks "${KEYSTORE}" \
