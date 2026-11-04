@@ -300,7 +300,24 @@ ClassicControllerSample ReadLiveController() {
     static bool haveFallbackMousePosition = false;
     static float fallbackMouseX = 0.0f, fallbackMouseY = 0.0f;
 
-#if !defined(__ANDROID__)
+#if defined(__ANDROID__)
+    // Android USB/Bluetooth mice arrive as absolute pointer coordinates.
+    // Use position deltas for camera look; SDL relative mode is not reliable
+    // across Android devices. Keep the returned button state for mouse clicks.
+    if (focusedWindow) {
+        float x = 0.0f, y = 0.0f;
+        mouseButtons = SDL_GetMouseState(&x, &y);
+        if (haveFallbackMousePosition) {
+            mouseDeltaX = x - fallbackMouseX;
+            mouseDeltaY = y - fallbackMouseY;
+        }
+        fallbackMouseX = x;
+        fallbackMouseY = y;
+        haveFallbackMousePosition = true;
+    } else {
+        haveFallbackMousePosition = false;
+    }
+#else
     if (focusedWindow) {
         if (TouchControls_IsMenuOpen()) {
             if (SDL_GetWindowRelativeMouseMode(focusedWindow)) {
@@ -320,15 +337,13 @@ ClassicControllerSample ReadLiveController() {
         if (!relativeModeUnavailable && !SDL_GetWindowRelativeMouseMode(focusedWindow) &&
             !SDL_SetWindowRelativeMouseMode(focusedWindow, true)) {
             relativeModeUnavailable = true;
-            std::fprintf(stderr, "MH3: SDL relative mouse mode failed; using cursor deltas: %s\n", SDL_GetError());
+            std::fprintf(stderr, "MH3: SDL relative mouse mode failed; using cursor deltas: %s\\n", SDL_GetError());
         }
 
         if (!relativeModeUnavailable && SDL_GetWindowRelativeMouseMode(focusedWindow)) {
             mouseButtons = SDL_GetRelativeMouseState(&mouseDeltaX, &mouseDeltaY);
             haveFallbackMousePosition = false;
         } else {
-            // Fallback for hosts where SDL cannot enable relative mode. It works inside the window;
-            // relative mode remains preferred because it has no edge limit.
             float x = 0.0f, y = 0.0f;
             mouseButtons = SDL_GetMouseState(&x, &y);
             if (haveFallbackMousePosition) {
@@ -340,7 +355,6 @@ ClassicControllerSample ReadLiveController() {
             haveFallbackMousePosition = true;
         }
     } else {
-        // Drain stale movement while the game window is not focused.
         (void)SDL_GetRelativeMouseState(nullptr, nullptr);
         haveFallbackMousePosition = false;
         relativeModeWindow = nullptr;
@@ -366,14 +380,12 @@ ClassicControllerSample ReadLiveController() {
         for (const auto& binding : bindings)
             if (keys[binding.key])
                 sample.buttons |= binding.button;
-#if !defined(__ANDROID__)
         if (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT))
             sample.buttons |= MH3_CL_A;
         if (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT))
             sample.buttons |= MH3_CL_X;
         if (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_MIDDLE))
             sample.buttons |= MH3_CL_R;
-#endif
 
         sample.leftX = int16_t((int(keys[SDL_SCANCODE_D]) - int(keys[SDL_SCANCODE_A])) * 511);
         sample.leftY = int16_t((int(keys[SDL_SCANCODE_W]) - int(keys[SDL_SCANCODE_S])) * 511);
