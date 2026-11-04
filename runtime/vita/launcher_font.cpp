@@ -25,9 +25,9 @@
 
 namespace VitaLauncher {
 namespace {
-// Glyphs render into a 64x64 coverage bitmap with the pen at (8, 40): the
-// baseline is row 40. Both sources draw at an 18-pixel em.
-constexpr unsigned Cell = 64, PenX = 8, Baseline = 40;
+// Glyphs render into a 64x64 coverage bitmap with the pen at (8, 46): the
+// baseline is row 46. Both sources draw at a 22-pixel em.
+constexpr unsigned Cell = 64, PenX = 8, Baseline = 46;
 using Bitmap = std::array<uint8_t, Cell * Cell>;
 } // namespace
 
@@ -69,7 +69,7 @@ struct Font::Source {
         }
 
         scePvfSetResolution(library, 72, 72);
-        scePvfSetCharSize(font, 18, 18);
+        scePvfSetCharSize(font, 22, 22);
         return nullptr;
     }
 
@@ -135,7 +135,7 @@ struct Font::Source {
         bitmapHandle = CreateDIBSection(dc, &info, DIB_RGB_COLORS, reinterpret_cast<void**>(&pixels), nullptr, 0);
         if (!bitmapHandle || !pixels) return "Cannot create the Windows font bitmap";
         oldBitmap = SelectObject(dc, bitmapHandle);
-        font = CreateFontW(-18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        font = CreateFontW(-22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
                            DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
         if (!font) font = CreateFontW(-18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
@@ -183,7 +183,7 @@ struct Font::Source {
             file.assign(std::istreambuf_iterator<char>(input), {});
 
             if (!file.empty() && stbtt_InitFont(&info, file.data(), stbtt_GetFontOffsetForIndex(file.data(), 0))) {
-                scale = stbtt_ScaleForMappingEmToPixels(&info, 18);
+                scale = stbtt_ScaleForMappingEmToPixels(&info, 22);
                 return nullptr;
             }
         }
@@ -279,7 +279,7 @@ void Font::Text(std::vector<Rectangle>& rects, float x, float y, std::string_vie
             break;
 
         for (const auto& run : glyph.runs)
-            rects.push_back({x + run.x, y + 18 + run.y, run.w, run.h, color});
+            rects.push_back({x + run.x, y + 22 + run.y, run.w, run.h, color});
 
         x += glyph.advance;
     }
