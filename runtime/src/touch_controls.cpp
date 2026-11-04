@@ -1936,17 +1936,17 @@ private:
             if (choiceCount > 0) {
                 const std::string value = LauncherCheats::ValueLabel(idx);
                 DrawText(x + w - 310.0f, ry + rowHeight * 0.5f - 12.0f, value.c_str(), 21.0f, COL_CYAN);
-                const float scrollButtonW = 58.0f;
-                const float scrollButtonH = 56.0f;
+                const float scrollButtonW = 76.0f;
+                const float scrollButtonH = 68.0f;
                 const float scrollButtonY = ry + (rowHeight - scrollButtonH) * 0.5f;
                 const float scrollLeftX = x + w - 390.0f;
                 const float scrollRightX = x + w - 214.0f;
                 DrawRoundedRect(scrollLeftX, scrollButtonY, scrollButtonW, scrollButtonH, 9.0f,
                                 {0.03f, 0.16f, 0.23f, 1.0f}, COL_CYAN);
-                DrawText(scrollLeftX + scrollButtonW * 0.5f, scrollButtonY + 8.0f, "<", 34.0f, COL_WHITE, true);
+                DrawText(scrollLeftX + scrollButtonW * 0.5f, scrollButtonY + 10.0f, "<", 40.0f, COL_WHITE, true);
                 DrawRoundedRect(scrollRightX, scrollButtonY, scrollButtonW, scrollButtonH, 9.0f,
                                 {0.03f, 0.16f, 0.23f, 1.0f}, COL_CYAN);
-                DrawText(scrollRightX + scrollButtonW * 0.5f, scrollButtonY + 8.0f, ">", 34.0f, COL_WHITE, true);
+                DrawText(scrollRightX + scrollButtonW * 0.5f, scrollButtonY + 10.0f, ">", 40.0f, COL_WHITE, true);
             }
 
             const bool on = LauncherCheats::Enabled(idx);
@@ -2168,7 +2168,7 @@ private:
                 if (count > 0) {
                     const float scrollLeftX = x + contentW - 390.0f;
                     const float scrollRightX = x + contentW - 214.0f;
-                    const float scrollButtonW = 58.0f;
+                    const float scrollButtonW = 76.0f;
                     if (px >= scrollLeftX && px <= scrollLeftX + scrollButtonW) {
                         const size_t selected = LauncherCheats::Selected(idx);
                         LauncherCheats::Select(idx, (selected + count - 1) % count);
