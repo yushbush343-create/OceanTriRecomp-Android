@@ -1761,12 +1761,12 @@ private:
             return;
         }
 
-        out << "MH3_CHEAT_PRESET 1\\n";
+        out << "MH3_CHEAT_PRESET 1\n";
         size_t saved = 0;
         for (size_t i = 0; i < cheats.size(); ++i) {
             if (!LauncherCheats::Enabled(i)) continue;
             out << i << ' ' << LauncherCheats::Selected(i) << ' '
-                << std::quoted(LauncherCheats::Text(i)) << '\\n';
+                << std::quoted(LauncherCheats::Text(i)) << '\n';
             ++saved;
         }
         out.flush();
