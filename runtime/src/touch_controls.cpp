@@ -1739,14 +1739,16 @@ private:
         DrawText(barX + 50.0f + bw * 4.5f, by + 9.0f, Tr("Cancelar", "Cancel"), 13.0f, COL_MUTED, true);
     }
 
-    std::filesystem::path CheatPresetPath() const {
+    static constexpr int kCheatLoadoutCount = 5;
+
+    std::filesystem::path CheatPresetPath(int slot) const {
         const char* user = std::getenv("MH3_USER_DIR");
         const std::filesystem::path dir = (user && *user) ? user : "/storage/emulated/0/MH3";
-        return dir / "cheat_presets" / "active_preset.txt";
+        return dir / "cheat_presets" / ("loadout_" + std::to_string(slot + 1) + ".txt");
     }
 
     void SaveCheatPreset() {
-        const auto path = CheatPresetPath();
+        const auto path = CheatPresetPath(m_cheatLoadoutSlot);
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
         if (ec) {
@@ -1774,14 +1776,21 @@ private:
             m_cheatPresetStatus = "Preset write failed";
             return;
         }
-        m_cheatPresetStatus = "Saved " + std::to_string(saved) + " active cheats";
+        m_cheatPresetStatus = "Saved loadout " + std::to_string(m_cheatLoadoutSlot + 1) + " (" + std::to_string(saved) + " cheats)";
     }
 
     void LoadCheatPreset() {
-        const auto path = CheatPresetPath();
+        const auto path = CheatPresetPath(m_cheatLoadoutSlot);
         std::ifstream in(path);
+        if (!in && m_cheatLoadoutSlot == 0) {
+            // Backward compatibility with the original single-preset saver.
+            const char* user = std::getenv("MH3_USER_DIR");
+            const std::filesystem::path dir = (user && *user) ? user : "/storage/emulated/0/MH3";
+            in.clear();
+            in.open(dir / "cheat_presets" / "active_preset.txt");
+        }
         if (!in) {
-            m_cheatPresetStatus = "No saved preset found";
+            m_cheatPresetStatus = "Loadout " + std::to_string(m_cheatLoadoutSlot + 1) + " is empty";
             return;
         }
 
@@ -1823,7 +1832,16 @@ private:
                 LauncherCheats::Select(entry.index, entry.choice);
             LauncherCheats::Enable(entry.index, true);
         }
-        m_cheatPresetStatus = "Loaded " + std::to_string(entries.size()) + " cheats";
+        m_cheatPresetStatus = "Loaded loadout " + std::to_string(m_cheatLoadoutSlot + 1) + " (" + std::to_string(entries.size()) + " cheats)";
+    }
+
+    void ClearEnabledCheats() {
+        const size_t before = LauncherCheats::EnabledCount();
+        const auto cheats = LauncherCheats::List();
+        for (size_t i = 0; i < cheats.size(); ++i)
+            if (LauncherCheats::Enabled(i))
+                LauncherCheats::Enable(i, false);
+        m_cheatPresetStatus = "Disabled " + std::to_string(before) + " cheats";
     }
 
     void RenderTabCheats(float x, float y, float w) {
@@ -1851,7 +1869,7 @@ private:
         const float availableH = std::max(300.0f, panelBottom - y - 18.0f);
         const float usedH = availableH * 0.95f;
         constexpr float categoryH = 72.0f;
-        constexpr float rowTop = 84.0f;
+        constexpr float rowTop = 140.0f;
         constexpr float footerH = 48.0f;
         const size_t first = size_t(m_cheatPage * kCheatsPerPage);
         const size_t visibleRows = std::max<size_t>(1, std::min<size_t>(kCheatsPerPage, ids.size() > first ? ids.size() - first : 1));
@@ -1863,20 +1881,45 @@ private:
         DrawText(x + 18.0f, y + 22.0f, "CATEGORY", 19.0f, COL_MUTED);
         DrawText(x + 132.0f, y + 18.0f, group.data(), 27.0f, COL_CYAN);
 
-        const float presetButtonY = y + 12.0f;
-        const float presetButtonW = 176.0f;
+        const float categoryArrowY = y + 12.0f;
+        const float categoryArrowW = 48.0f;
+        const float categoryArrowH = 48.0f;
+        const float categoryLeftX = x + w - 116.0f;
+        const float categoryRightX = x + w - 60.0f;
+        DrawRoundedRect(categoryLeftX, categoryArrowY, categoryArrowW, categoryArrowH, 8.0f,
+                        {0.04f, 0.18f, 0.25f, 0.98f}, COL_CYAN);
+        DrawText(categoryLeftX + categoryArrowW * 0.5f, categoryArrowY + 6.0f, "<", 34.0f, COL_WHITE, true);
+        DrawRoundedRect(categoryRightX, categoryArrowY, categoryArrowW, categoryArrowH, 8.0f,
+                        {0.04f, 0.18f, 0.25f, 0.98f}, COL_CYAN);
+        DrawText(categoryRightX + categoryArrowW * 0.5f, categoryArrowY + 6.0f, ">", 34.0f, COL_WHITE, true);
+
+        // Dedicated second row keeps the category title and loadout controls clear.
+        const float presetButtonY = y + 78.0f;
         const float presetButtonH = 48.0f;
-        const float savePresetX = x + w - 500.0f;
-        const float loadPresetX = x + w - 304.0f;
-        DrawRoundedRect(savePresetX, presetButtonY, presetButtonW, presetButtonH,
-                        8.0f, {0.08f, 0.35f, 0.45f, 0.95f}, COL_CYAN);
-        DrawText(savePresetX + presetButtonW * 0.5f, presetButtonY + 14.0f,
-                 "SAVE ACTIVE", 18.0f, COL_WHITE, true);
-        DrawRoundedRect(loadPresetX, presetButtonY, presetButtonW, presetButtonH,
-                        8.0f, {0.12f, 0.30f, 0.38f, 0.95f}, COL_CYAN);
-        DrawText(loadPresetX + presetButtonW * 0.5f, presetButtonY + 14.0f,
-                 "LOAD SAVED", 18.0f, COL_WHITE, true);
-        DrawText(x + w - 92.0f, y + 18.0f, "<   >", 25.0f, COL_WHITE);
+        const float slotButtonW = 150.0f;
+        const float actionButtonW = 136.0f;
+        const float clearButtonW = 150.0f;
+        const float gap = 8.0f;
+        const float clearPresetX = x + w - clearButtonW;
+        const float loadPresetX = clearPresetX - gap - actionButtonW;
+        const float savePresetX = loadPresetX - gap - actionButtonW;
+        const float slotPresetX = savePresetX - gap - slotButtonW;
+        DrawRoundedRect(slotPresetX, presetButtonY, slotButtonW, presetButtonH, 8.0f,
+                        {0.04f, 0.18f, 0.25f, 0.98f}, COL_CYAN);
+        DrawText(slotPresetX + 23.0f, presetButtonY + 8.0f, "<", 30.0f, COL_WHITE, true);
+        char slotLabel[32];
+        std::snprintf(slotLabel, sizeof(slotLabel), "LOADOUT %d", m_cheatLoadoutSlot + 1);
+        DrawText(slotPresetX + slotButtonW * 0.5f, presetButtonY + 15.0f, slotLabel, 17.0f, COL_WHITE, true);
+        DrawText(slotPresetX + slotButtonW - 23.0f, presetButtonY + 8.0f, ">", 30.0f, COL_WHITE, true);
+        DrawRoundedRect(savePresetX, presetButtonY, actionButtonW, presetButtonH, 8.0f,
+                        {0.08f, 0.35f, 0.45f, 0.98f}, COL_CYAN);
+        DrawText(savePresetX + actionButtonW * 0.5f, presetButtonY + 14.0f, "SAVE LOADOUT", 16.0f, COL_WHITE, true);
+        DrawRoundedRect(loadPresetX, presetButtonY, actionButtonW, presetButtonH, 8.0f,
+                        {0.12f, 0.30f, 0.38f, 0.98f}, COL_CYAN);
+        DrawText(loadPresetX + actionButtonW * 0.5f, presetButtonY + 14.0f, "LOAD LOADOUT", 16.0f, COL_WHITE, true);
+        DrawRoundedRect(clearPresetX, presetButtonY, clearButtonW, presetButtonH, 8.0f,
+                        {0.35f, 0.08f, 0.10f, 0.98f}, {1.0f, 0.38f, 0.40f, 1.0f});
+        DrawText(clearPresetX + clearButtonW * 0.5f, presetButtonY + 14.0f, "CLEAR ALL", 18.0f, COL_WHITE, true);
 
         for (size_t row = 0; row < visibleRows; ++row) {
             const size_t pos = first + row;
@@ -1893,8 +1936,17 @@ private:
             if (choiceCount > 0) {
                 const std::string value = LauncherCheats::ValueLabel(idx);
                 DrawText(x + w - 310.0f, ry + rowHeight * 0.5f - 12.0f, value.c_str(), 21.0f, COL_CYAN);
-                DrawText(x + w - 365.0f, ry + rowHeight * 0.5f - 12.0f, "<", 25.0f, COL_WHITE);
-                DrawText(x + w - 185.0f, ry + rowHeight * 0.5f - 12.0f, ">", 25.0f, COL_WHITE);
+                const float scrollButtonW = 58.0f;
+                const float scrollButtonH = 56.0f;
+                const float scrollButtonY = ry + (rowHeight - scrollButtonH) * 0.5f;
+                const float scrollLeftX = x + w - 390.0f;
+                const float scrollRightX = x + w - 214.0f;
+                DrawRoundedRect(scrollLeftX, scrollButtonY, scrollButtonW, scrollButtonH, 9.0f,
+                                {0.03f, 0.16f, 0.23f, 1.0f}, COL_CYAN);
+                DrawText(scrollLeftX + scrollButtonW * 0.5f, scrollButtonY + 8.0f, "<", 34.0f, COL_WHITE, true);
+                DrawRoundedRect(scrollRightX, scrollButtonY, scrollButtonW, scrollButtonH, 9.0f,
+                                {0.03f, 0.16f, 0.23f, 1.0f}, COL_CYAN);
+                DrawText(scrollRightX + scrollButtonW * 0.5f, scrollButtonY + 8.0f, ">", 34.0f, COL_WHITE, true);
             }
 
             const bool on = LauncherCheats::Enabled(idx);
@@ -1916,7 +1968,17 @@ private:
         DrawText(x + 14.0f, footerY, info, 20.0f, COL_MUTED);
         if (!m_cheatPresetStatus.empty())
             DrawText(x + 300.0f, footerY, m_cheatPresetStatus.c_str(), 18.0f, COL_CYAN);
-        DrawText(x + w - 128.0f, footerY - 4.0f, "<   >", 26.0f, COL_WHITE);
+        const float pageArrowY = footerY - 12.0f;
+        const float pageArrowW = 54.0f;
+        const float pageArrowH = 48.0f;
+        const float pageLeftX = x + w - 132.0f;
+        const float pageRightX = x + w - 70.0f;
+        DrawRoundedRect(pageLeftX, pageArrowY, pageArrowW, pageArrowH, 8.0f,
+                        {0.04f, 0.18f, 0.25f, 0.98f}, COL_CYAN);
+        DrawText(pageLeftX + pageArrowW * 0.5f, pageArrowY + 6.0f, "<", 34.0f, COL_WHITE, true);
+        DrawRoundedRect(pageRightX, pageArrowY, pageArrowW, pageArrowH, 8.0f,
+                        {0.04f, 0.18f, 0.25f, 0.98f}, COL_CYAN);
+        DrawText(pageRightX + pageArrowW * 0.5f, pageArrowY + 6.0f, ">", 34.0f, COL_WHITE, true);
     }
 
     void RenderTabOnline(float x, float y, float w) {
@@ -2035,20 +2097,44 @@ private:
             constexpr int kCheatsPerPage = 5;
 
             if (py >= contentY && py <= contentY + categoryH) {
-                if (px >= x + contentW - 500.0f && px < x + contentW - 324.0f) {
-                    SaveCheatPreset();
-                    return;
-                }
-                if (px >= x + contentW - 304.0f && px < x + contentW - 128.0f) {
-                    LoadCheatPreset();
-                    return;
-                }
                 if (px >= x + contentW - 116.0f && px < x + contentW - 68.0f)
                     m_cheatGroupIndex = (m_cheatGroupIndex + int(groups.size()) - 1) % int(groups.size());
                 else if (px >= x + contentW - 60.0f && px < x + contentW - 8.0f)
                     m_cheatGroupIndex = (m_cheatGroupIndex + 1) % int(groups.size());
                 m_cheatPage = 0;
                 return;
+            }
+
+            const float presetButtonY = contentY + 78.0f;
+            const float presetButtonH = 48.0f;
+            const float slotButtonW = 150.0f;
+            const float actionButtonW = 136.0f;
+            const float clearButtonW = 150.0f;
+            const float gap = 8.0f;
+            const float clearPresetX = x + contentW - clearButtonW;
+            const float loadPresetX = clearPresetX - gap - actionButtonW;
+            const float savePresetX = loadPresetX - gap - actionButtonW;
+            const float slotPresetX = savePresetX - gap - slotButtonW;
+            if (py >= presetButtonY && py <= presetButtonY + presetButtonH) {
+                if (px >= slotPresetX && px <= slotPresetX + slotButtonW) {
+                    if (px < slotPresetX + 48.0f)
+                        m_cheatLoadoutSlot = (m_cheatLoadoutSlot + kCheatLoadoutCount - 1) % kCheatLoadoutCount;
+                    else if (px > slotPresetX + slotButtonW - 48.0f)
+                        m_cheatLoadoutSlot = (m_cheatLoadoutSlot + 1) % kCheatLoadoutCount;
+                    return;
+                }
+                if (px >= savePresetX && px <= savePresetX + actionButtonW) {
+                    SaveCheatPreset();
+                    return;
+                }
+                if (px >= loadPresetX && px <= loadPresetX + actionButtonW) {
+                    LoadCheatPreset();
+                    return;
+                }
+                if (px >= clearPresetX && px <= clearPresetX + clearButtonW) {
+                    ClearEnabledCheats();
+                    return;
+                }
             }
 
             const std::string_view group(groups[size_t(m_cheatGroupIndex)]);
@@ -2079,19 +2165,28 @@ private:
                     return;
                 }
                 const size_t count = LauncherCheats::Choices(idx);
-                if (count > 0 && px >= x + contentW - 390.0f && px < x + contentW - 170.0f) {
-                    size_t selected = LauncherCheats::Selected(idx);
-                    selected = px < x + contentW - 280.0f ? (selected + count - 1) % count : (selected + 1) % count;
-                    LauncherCheats::Select(idx, selected);
-                    return;
+                if (count > 0) {
+                    const float scrollLeftX = x + contentW - 390.0f;
+                    const float scrollRightX = x + contentW - 214.0f;
+                    const float scrollButtonW = 58.0f;
+                    if (px >= scrollLeftX && px <= scrollLeftX + scrollButtonW) {
+                        const size_t selected = LauncherCheats::Selected(idx);
+                        LauncherCheats::Select(idx, (selected + count - 1) % count);
+                        return;
+                    }
+                    if (px >= scrollRightX && px <= scrollRightX + scrollButtonW) {
+                        const size_t selected = LauncherCheats::Selected(idx);
+                        LauncherCheats::Select(idx, (selected + 1) % count);
+                        return;
+                    }
                 }
             }
 
             const float footerY = contentY + usedH - 34.0f;
             if (py >= footerY - 12.0f && py <= footerY + 32.0f) {
-                if (px >= x + contentW - 132.0f && px < x + contentW - 72.0f)
+                if (px >= x + contentW - 132.0f && px <= x + contentW - 78.0f)
                     m_cheatPage = (m_cheatPage + pages - 1) % pages;
-                else if (px >= x + contentW - 68.0f && px < x + contentW - 8.0f)
+                else if (px >= x + contentW - 70.0f && px <= x + contentW - 16.0f)
                     m_cheatPage = (m_cheatPage + 1) % pages;
             }
             return;
@@ -2947,6 +3042,7 @@ private:
     int m_menuTab = 0;
     int m_cheatGroupIndex = 0;
     int m_cheatPage = 0;
+    int m_cheatLoadoutSlot = 0;
     int m_resolutionIndex = 0; // 0: Wii Original (1x)
     int m_aspectIndex = 0;     // 16:9 Panorámica (default)
     bool m_fullscreen = false;
