@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <filesystem>
 #include <chrono>
@@ -1738,6 +1739,93 @@ private:
         DrawText(barX + 50.0f + bw * 4.5f, by + 9.0f, Tr("Cancelar", "Cancel"), 13.0f, COL_MUTED, true);
     }
 
+    std::filesystem::path CheatPresetPath() const {
+        const char* user = std::getenv("MH3_USER_DIR");
+        const std::filesystem::path dir = (user && *user) ? user : "/storage/emulated/0/MH3";
+        return dir / "cheat_presets" / "active_preset.txt";
+    }
+
+    void SaveCheatPreset() {
+        const auto path = CheatPresetPath();
+        std::error_code ec;
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec) {
+            m_cheatPresetStatus = "Cannot create preset folder";
+            return;
+        }
+
+        const auto cheats = LauncherCheats::List();
+        std::ofstream out(path, std::ios::trunc);
+        if (!out) {
+            m_cheatPresetStatus = "Could not save preset";
+            return;
+        }
+
+        out << "MH3_CHEAT_PRESET 1\\n";
+        size_t saved = 0;
+        for (size_t i = 0; i < cheats.size(); ++i) {
+            if (!LauncherCheats::Enabled(i)) continue;
+            out << i << ' ' << LauncherCheats::Selected(i) << ' '
+                << std::quoted(LauncherCheats::Text(i)) << '\\n';
+            ++saved;
+        }
+        out.flush();
+        if (!out) {
+            m_cheatPresetStatus = "Preset write failed";
+            return;
+        }
+        m_cheatPresetStatus = "Saved " + std::to_string(saved) + " active cheats";
+    }
+
+    void LoadCheatPreset() {
+        const auto path = CheatPresetPath();
+        std::ifstream in(path);
+        if (!in) {
+            m_cheatPresetStatus = "No saved preset found";
+            return;
+        }
+
+        std::string header;
+        std::getline(in, header);
+        if (header != "MH3_CHEAT_PRESET 1") {
+            m_cheatPresetStatus = "Preset format not supported";
+            return;
+        }
+
+        const auto cheats = LauncherCheats::List();
+        // Validate the complete file before changing any live cheat state.
+        struct Entry { size_t index; size_t choice; std::string text; };
+        std::vector<Entry> entries;
+        size_t index = 0, choice = 0;
+        std::string text;
+        while (in >> index >> choice >> std::quoted(text)) {
+            if (index >= cheats.size() || choice >= std::max<size_t>(1, LauncherCheats::Choices(index)) ||
+                text.size() > LauncherCheats::TextLength(index)) {
+                m_cheatPresetStatus = "Preset contains invalid data";
+                return;
+            }
+            entries.push_back({index, choice, text});
+        }
+        if (!in.eof()) {
+            m_cheatPresetStatus = "Preset file is damaged";
+            return;
+        }
+
+        for (size_t i = 0; i < cheats.size(); ++i)
+            LauncherCheats::Enable(i, false);
+        for (const auto& entry : entries) {
+            if (LauncherCheats::TextLength(entry.index) > 0 &&
+                !LauncherCheats::SetText(entry.index, entry.text)) {
+                m_cheatPresetStatus = "Could not restore cheat text";
+                return;
+            }
+            if (LauncherCheats::Choices(entry.index) > 0)
+                LauncherCheats::Select(entry.index, entry.choice);
+            LauncherCheats::Enable(entry.index, true);
+        }
+        m_cheatPresetStatus = "Loaded " + std::to_string(entries.size()) + " cheats";
+    }
+
     void RenderTabCheats(float x, float y, float w) {
         const auto groups = LauncherCheats::Groups();
         const auto cheats = LauncherCheats::List();
@@ -1774,7 +1862,21 @@ private:
         DrawRoundedRect(x, y, w, categoryH, 10.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
         DrawText(x + 18.0f, y + 22.0f, "CATEGORY", 19.0f, COL_MUTED);
         DrawText(x + 132.0f, y + 18.0f, group.data(), 27.0f, COL_CYAN);
-        DrawText(x + w - 112.0f, y + 18.0f, "<     >", 25.0f, COL_WHITE);
+
+        const float presetButtonY = y + 12.0f;
+        const float presetButtonW = 176.0f;
+        const float presetButtonH = 48.0f;
+        const float savePresetX = x + w - 500.0f;
+        const float loadPresetX = x + w - 304.0f;
+        DrawRoundedRect(savePresetX, presetButtonY, presetButtonW, presetButtonH,
+                        8.0f, {0.08f, 0.35f, 0.45f, 0.95f}, COL_CYAN);
+        DrawText(savePresetX + presetButtonW * 0.5f, presetButtonY + 14.0f,
+                 "SAVE ACTIVE", 18.0f, COL_WHITE, true);
+        DrawRoundedRect(loadPresetX, presetButtonY, presetButtonW, presetButtonH,
+                        8.0f, {0.12f, 0.30f, 0.38f, 0.95f}, COL_CYAN);
+        DrawText(loadPresetX + presetButtonW * 0.5f, presetButtonY + 14.0f,
+                 "LOAD SAVED", 18.0f, COL_WHITE, true);
+        DrawText(x + w - 92.0f, y + 18.0f, "<   >", 25.0f, COL_WHITE);
 
         for (size_t row = 0; row < visibleRows; ++row) {
             const size_t pos = first + row;
@@ -1812,6 +1914,8 @@ private:
                       LauncherCheats::EnabledCount(), m_cheatPage + 1, pages);
         const float footerY = y + usedH - 34.0f;
         DrawText(x + 14.0f, footerY, info, 20.0f, COL_MUTED);
+        if (!m_cheatPresetStatus.empty())
+            DrawText(x + 300.0f, footerY, m_cheatPresetStatus.c_str(), 18.0f, COL_CYAN);
         DrawText(x + w - 128.0f, footerY - 4.0f, "<   >", 26.0f, COL_WHITE);
     }
 
@@ -1931,9 +2035,17 @@ private:
             constexpr int kCheatsPerPage = 5;
 
             if (py >= contentY && py <= contentY + categoryH) {
-                if (px >= x + contentW - 126.0f && px < x + contentW - 68.0f)
+                if (px >= x + contentW - 500.0f && px < x + contentW - 324.0f) {
+                    SaveCheatPreset();
+                    return;
+                }
+                if (px >= x + contentW - 304.0f && px < x + contentW - 128.0f) {
+                    LoadCheatPreset();
+                    return;
+                }
+                if (px >= x + contentW - 116.0f && px < x + contentW - 68.0f)
                     m_cheatGroupIndex = (m_cheatGroupIndex + int(groups.size()) - 1) % int(groups.size());
-                else if (px >= x + contentW - 64.0f && px < x + contentW - 8.0f)
+                else if (px >= x + contentW - 60.0f && px < x + contentW - 8.0f)
                     m_cheatGroupIndex = (m_cheatGroupIndex + 1) % int(groups.size());
                 m_cheatPage = 0;
                 return;
@@ -2852,6 +2964,7 @@ private:
     int m_langChoice = 0;      // 0: Español
     double m_liveFps = 60.0;
     std::string m_saveStatusMsg = "Listo para exportar o importar partidas guardadas.";
+    std::string m_cheatPresetStatus = "";
     int m_onlineMode = 3;
     std::string m_onlineHostIp = "mh3sp.com";
     std::string m_onlineStatusMsg = "Servidor oficial de la comunidad mh3sp.com activado.";
