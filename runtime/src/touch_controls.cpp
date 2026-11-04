@@ -1742,62 +1742,77 @@ private:
         const auto groups = LauncherCheats::Groups();
         const auto cheats = LauncherCheats::List();
         if (groups.empty()) {
-            DrawText(x + 16.0f, y + 20.0f, "No cheats available.", 20.0f, COL_WHITE);
+            DrawText(x + 18.0f, y + 24.0f, "No cheats available.", 28.0f, COL_WHITE);
             return;
         }
 
         m_cheatGroupIndex = std::clamp(m_cheatGroupIndex, 0, int(groups.size()) - 1);
-        std::string_view group(groups[size_t(m_cheatGroupIndex)]);
+        const std::string_view group(groups[size_t(m_cheatGroupIndex)]);
         std::vector<size_t> ids;
         for (size_t i = 0; i < cheats.size(); ++i)
             if (cheats[i].group && group == cheats[i].group) ids.push_back(i);
 
-        const int pages = std::max(1, int((ids.size() + 4) / 5));
+        constexpr int kCheatsPerPage = 5;
+        const int pages = std::max(1, int((ids.size() + kCheatsPerPage - 1) / kCheatsPerPage));
         m_cheatPage = std::clamp(m_cheatPage, 0, pages - 1);
 
-        // Give the category and every cheat row enough height for readable text.
-        DrawRoundedRect(x, y, w, 56.0f, 8.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
-        DrawText(x + 14.0f, y + 17.0f, "CATEGORY", 15.0f, COL_MUTED);
-        DrawText(x + 112.0f, y + 15.0f, group.data(), 20.0f, COL_CYAN);
-        DrawText(x + w - 104.0f, y + 15.0f, "<     >", 19.0f, COL_WHITE);
+        // Use almost all available panel height instead of leaving the lower
+        // part of the screen empty. Rows expand to fill the space when a
+        // category contains fewer than five cheats.
+        const float panelBottom = float(m_height) * 0.96f;
+        const float availableH = std::max(300.0f, panelBottom - y - 18.0f);
+        const float usedH = availableH * 0.95f;
+        constexpr float categoryH = 72.0f;
+        constexpr float rowTop = 84.0f;
+        constexpr float footerH = 48.0f;
+        const size_t first = size_t(m_cheatPage * kCheatsPerPage);
+        const size_t visibleRows = std::max<size_t>(1, std::min<size_t>(kCheatsPerPage, ids.size() > first ? ids.size() - first : 1));
+        const float rowsArea = std::max(visibleRows * 64.0f, usedH - rowTop - footerH - 12.0f);
+        const float rowStep = rowsArea / float(visibleRows);
+        const float rowHeight = rowStep - 8.0f;
 
-        constexpr float rowTop = 64.0f;
-        constexpr float rowStep = 56.0f;
-        constexpr float rowHeight = 52.0f;
-        for (int row = 0; row < 5; ++row) {
-            const size_t pos = size_t(m_cheatPage * 5 + row);
+        DrawRoundedRect(x, y, w, categoryH, 10.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
+        DrawText(x + 18.0f, y + 22.0f, "CATEGORY", 19.0f, COL_MUTED);
+        DrawText(x + 132.0f, y + 18.0f, group.data(), 27.0f, COL_CYAN);
+        DrawText(x + w - 112.0f, y + 18.0f, "<     >", 25.0f, COL_WHITE);
+
+        for (size_t row = 0; row < visibleRows; ++row) {
+            const size_t pos = first + row;
             if (pos >= ids.size()) break;
-
             const size_t idx = ids[pos];
             const auto& cheat = cheats[idx];
             const float ry = y + rowTop + float(row) * rowStep;
-            DrawRoundedRect(x, ry, w, rowHeight, 8.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
-            DrawText(x + 14.0f, ry + 5.0f, cheat.name ? cheat.name : "Unnamed", 18.0f, COL_WHITE);
+            DrawRoundedRect(x, ry, w, rowHeight, 10.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
+            DrawText(x + 18.0f, ry + 12.0f, cheat.name ? cheat.name : "Unnamed", 28.0f, COL_WHITE);
             if (cheat.detail && cheat.detail[0])
-                DrawText(x + 14.0f, ry + 29.0f, cheat.detail, 13.5f, COL_MUTED);
+                DrawText(x + 18.0f, ry + 49.0f, cheat.detail, 19.0f, COL_MUTED);
 
             const size_t choiceCount = LauncherCheats::Choices(idx);
             if (choiceCount > 0) {
                 const std::string value = LauncherCheats::ValueLabel(idx);
-                DrawText(x + w - 226.0f, ry + 17.0f, value.c_str(), 15.0f, COL_CYAN);
-                DrawText(x + w - 270.0f, ry + 17.0f, "<", 17.0f, COL_WHITE);
-                DrawText(x + w - 132.0f, ry + 17.0f, ">", 17.0f, COL_WHITE);
+                DrawText(x + w - 310.0f, ry + rowHeight * 0.5f - 12.0f, value.c_str(), 21.0f, COL_CYAN);
+                DrawText(x + w - 365.0f, ry + rowHeight * 0.5f - 12.0f, "<", 25.0f, COL_WHITE);
+                DrawText(x + w - 185.0f, ry + rowHeight * 0.5f - 12.0f, ">", 25.0f, COL_WHITE);
             }
 
             const bool on = LauncherCheats::Enabled(idx);
-            const float bx = x + w - 86.0f;
-            DrawRoundedRect(bx, ry + 7.0f, 76.0f, 38.0f, 7.0f,
+            const float buttonW = 132.0f;
+            const float buttonH = std::min(64.0f, rowHeight - 12.0f);
+            const float bx = x + w - buttonW - 12.0f;
+            const float by = ry + (rowHeight - buttonH) * 0.5f;
+            DrawRoundedRect(bx, by, buttonW, buttonH, 10.0f,
                             on ? COL_ACTIVE_CHIP : COL_INACTIVE_CHIP,
                             on ? COL_CYAN : COL_CHIP_BORDER);
-            DrawText(bx + 38.0f, ry + 17.0f, on ? "ON" : "OFF", 16.0f,
-                     on ? COL_ACTIVE_TEXT : COL_WHITE, true);
+            DrawText(bx + buttonW * 0.5f, by + (buttonH - 25.0f) * 0.5f,
+                     on ? "ON" : "OFF", 25.0f, on ? COL_ACTIVE_TEXT : COL_WHITE, true);
         }
 
         char info[80];
         std::snprintf(info, sizeof(info), "Enabled: %zu    Page %d/%d",
                       LauncherCheats::EnabledCount(), m_cheatPage + 1, pages);
-        DrawText(x + 10.0f, y + 354.0f, info, 16.0f, COL_MUTED);
-        DrawText(x + w - 112.0f, y + 350.0f, "<   >", 20.0f, COL_WHITE);
+        const float footerY = y + usedH - 34.0f;
+        DrawText(x + 14.0f, footerY, info, 20.0f, COL_MUTED);
+        DrawText(x + w - 128.0f, footerY - 4.0f, "<   >", 26.0f, COL_WHITE);
     }
 
     void RenderTabOnline(float x, float y, float w) {
@@ -1902,13 +1917,72 @@ private:
         float x = padX + 20.0f;
 
         if (m_menuTab == 5) {
-            const auto groups=LauncherCheats::Groups(); const auto cheats=LauncherCheats::List(); if(groups.empty()) return;
-            m_cheatGroupIndex=std::clamp(m_cheatGroupIndex,0,int(groups.size())-1);
-            if(py>=contentY && py<=contentY+48.0f) { if(px>=x+contentW-116.0f && px<x+contentW-70.0f) m_cheatGroupIndex=(m_cheatGroupIndex+int(groups.size())-1)%int(groups.size()); else if(px>=x+contentW-60.0f && px<x+contentW-14.0f) m_cheatGroupIndex=(m_cheatGroupIndex+1)%int(groups.size()); m_cheatPage=0; return; }
-            std::string_view group(groups[size_t(m_cheatGroupIndex)]); std::vector<size_t> ids; for(size_t i=0;i<cheats.size();++i) if(cheats[i].group && group==cheats[i].group) ids.push_back(i);
-            int pages=std::max(1,int((ids.size()+4)/5));
-            for(int row=0;row<5;++row) { size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break; float ry=contentY+56.0f+float(row)*48.0f; if(py>=ry && py<=ry+43.0f) { size_t idx=ids[pos]; if(px>=x+contentW-86.0f) { LauncherCheats::Enable(idx,!LauncherCheats::Enabled(idx)); return; } size_t count=LauncherCheats::Choices(idx); if(count>0 && px>=x+contentW-265.0f && px<x+contentW-105.0f) { size_t selected=LauncherCheats::Selected(idx); selected=px<x+contentW-185.0f?(selected+count-1)%count:(selected+1)%count; LauncherCheats::Select(idx,selected); return; } } }
-            if(py>=contentY+292.0f && py<=contentY+326.0f) { if(px>=x+contentW-116.0f && px<x+contentW-66.0f) m_cheatPage=(m_cheatPage+pages-1)%pages; else if(px>=x+contentW-58.0f && px<x+contentW-8.0f) m_cheatPage=(m_cheatPage+1)%pages; } return;
+            const auto groups = LauncherCheats::Groups();
+            const auto cheats = LauncherCheats::List();
+            if (groups.empty()) return;
+            m_cheatGroupIndex = std::clamp(m_cheatGroupIndex, 0, int(groups.size()) - 1);
+
+            const float panelBottom = float(m_height) * 0.96f;
+            const float availableH = std::max(300.0f, panelBottom - contentY - 18.0f);
+            const float usedH = availableH * 0.95f;
+            constexpr float categoryH = 72.0f;
+            constexpr float rowTop = 84.0f;
+            constexpr float footerH = 48.0f;
+            constexpr int kCheatsPerPage = 5;
+
+            if (py >= contentY && py <= contentY + categoryH) {
+                if (px >= x + contentW - 126.0f && px < x + contentW - 68.0f)
+                    m_cheatGroupIndex = (m_cheatGroupIndex + int(groups.size()) - 1) % int(groups.size());
+                else if (px >= x + contentW - 64.0f && px < x + contentW - 8.0f)
+                    m_cheatGroupIndex = (m_cheatGroupIndex + 1) % int(groups.size());
+                m_cheatPage = 0;
+                return;
+            }
+
+            const std::string_view group(groups[size_t(m_cheatGroupIndex)]);
+            std::vector<size_t> ids;
+            for (size_t i = 0; i < cheats.size(); ++i)
+                if (cheats[i].group && group == cheats[i].group) ids.push_back(i);
+            const int pages = std::max(1, int((ids.size() + kCheatsPerPage - 1) / kCheatsPerPage));
+            m_cheatPage = std::clamp(m_cheatPage, 0, pages - 1);
+
+            const size_t first = size_t(m_cheatPage * kCheatsPerPage);
+            const size_t visibleRows = std::max<size_t>(1, std::min<size_t>(kCheatsPerPage, ids.size() > first ? ids.size() - first : 1));
+            const float rowsArea = std::max(visibleRows * 64.0f, usedH - rowTop - footerH - 12.0f);
+            const float rowStep = rowsArea / float(visibleRows);
+            const float rowHeight = rowStep - 8.0f;
+
+            for (size_t row = 0; row < visibleRows; ++row) {
+                const size_t pos = first + row;
+                if (pos >= ids.size()) break;
+                const float ry = contentY + rowTop + float(row) * rowStep;
+                if (py < ry || py > ry + rowHeight) continue;
+                const size_t idx = ids[pos];
+                const float buttonW = 132.0f;
+                const float buttonH = std::min(64.0f, rowHeight - 12.0f);
+                const float bx = x + contentW - buttonW - 12.0f;
+                const float by = ry + (rowHeight - buttonH) * 0.5f;
+                if (px >= bx && px <= bx + buttonW && py >= by && py <= by + buttonH) {
+                    LauncherCheats::Enable(idx, !LauncherCheats::Enabled(idx));
+                    return;
+                }
+                const size_t count = LauncherCheats::Choices(idx);
+                if (count > 0 && px >= x + contentW - 390.0f && px < x + contentW - 170.0f) {
+                    size_t selected = LauncherCheats::Selected(idx);
+                    selected = px < x + contentW - 280.0f ? (selected + count - 1) % count : (selected + 1) % count;
+                    LauncherCheats::Select(idx, selected);
+                    return;
+                }
+            }
+
+            const float footerY = contentY + usedH - 34.0f;
+            if (py >= footerY - 12.0f && py <= footerY + 32.0f) {
+                if (px >= x + contentW - 132.0f && px < x + contentW - 72.0f)
+                    m_cheatPage = (m_cheatPage + pages - 1) % pages;
+                else if (px >= x + contentW - 68.0f && px < x + contentW - 8.0f)
+                    m_cheatPage = (m_cheatPage + 1) % pages;
+            }
+            return;
         }
         if (m_menuTab == 0) { // Gráficos
             float chipH = 38.0f;
