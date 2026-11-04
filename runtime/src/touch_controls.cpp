@@ -2092,7 +2092,7 @@ private:
             const float availableH = std::max(300.0f, panelBottom - contentY - 18.0f);
             const float usedH = availableH * 0.95f;
             constexpr float categoryH = 72.0f;
-            constexpr float rowTop = 84.0f;
+            constexpr float rowTop = 140.0f;
             constexpr float footerH = 48.0f;
             constexpr int kCheatsPerPage = 5;
 
