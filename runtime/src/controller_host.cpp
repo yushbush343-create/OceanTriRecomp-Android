@@ -337,7 +337,7 @@ ClassicControllerSample ReadLiveController() {
         if (!relativeModeUnavailable && !SDL_GetWindowRelativeMouseMode(focusedWindow) &&
             !SDL_SetWindowRelativeMouseMode(focusedWindow, true)) {
             relativeModeUnavailable = true;
-            std::fprintf(stderr, "MH3: SDL relative mouse mode failed; using cursor deltas: %s\\n", SDL_GetError());
+            std::fprintf(stderr, "MH3: SDL relative mouse mode failed; using cursor deltas: %s\n", SDL_GetError());
         }
 
         if (!relativeModeUnavailable && SDL_GetWindowRelativeMouseMode(focusedWindow)) {
