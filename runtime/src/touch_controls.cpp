@@ -1738,31 +1738,66 @@ private:
         DrawText(barX + 50.0f + bw * 4.5f, by + 9.0f, Tr("Cancelar", "Cancel"), 13.0f, COL_MUTED, true);
     }
 
-    void RenderTabCheats(float x,float y,float w) {
-        const auto groups=LauncherCheats::Groups(); const auto cheats=LauncherCheats::List();
-        if(groups.empty()) { DrawText(x+16.0f,y+20.0f,"No cheats available.",16.0f,COL_WHITE); return; }
-        m_cheatGroupIndex=std::clamp(m_cheatGroupIndex,0,int(groups.size())-1);
-        std::string_view group(groups[size_t(m_cheatGroupIndex)]); std::vector<size_t> ids;
-        for(size_t i=0;i<cheats.size();++i) if(cheats[i].group && group==cheats[i].group) ids.push_back(i);
-        int pages=std::max(1,int((ids.size()+4)/5)); m_cheatPage=std::clamp(m_cheatPage,0,pages-1);
-        DrawRoundedRect(x,y,w,48.0f,8.0f,COL_PANEL_CARD,COL_PANEL_BORDER);
-        DrawText(x+12.0f,y+14.0f,"CATEGORY",12.0f,COL_MUTED);
-        DrawText(x+105.0f,y+13.0f,group.data(),16.0f,COL_CYAN);
-        DrawText(x+w-92.0f,y+13.0f,"<     >",15.0f,COL_WHITE);
-        for(int row=0;row<5;++row) {
-            size_t pos=size_t(m_cheatPage*5+row); if(pos>=ids.size()) break;
-            size_t idx=ids[pos]; const auto& c=cheats[idx]; float ry=y+56.0f+float(row)*48.0f;
-            DrawRoundedRect(x,ry,w,43.0f,7.0f,COL_PANEL_CARD,COL_PANEL_BORDER);
-            DrawText(x+10.0f,ry+5.0f,c.name?c.name:"Unnamed",13.0f,COL_WHITE);
-            if(c.detail && c.detail[0]) DrawText(x+10.0f,ry+23.0f,c.detail,9.5f,COL_MUTED);
-            const size_t choiceCount=LauncherCheats::Choices(idx);
-            if(choiceCount>0) { const std::string value=LauncherCheats::ValueLabel(idx); DrawText(x+w-210.0f,ry+15.0f,value.c_str(),10.0f,COL_CYAN); DrawText(x+w-255.0f,ry+15.0f,"<",12.0f,COL_WHITE); DrawText(x+w-125.0f,ry+15.0f,">",12.0f,COL_WHITE); }
-            bool on=LauncherCheats::Enabled(idx); float bx=x+w-78.0f;
-            DrawRoundedRect(bx,ry+6.0f,68.0f,30.0f,6.0f,on?COL_ACTIVE_CHIP:COL_INACTIVE_CHIP,on?COL_CYAN:COL_CHIP_BORDER);
-            DrawText(bx+34.0f,ry+14.0f,on?"ON":"OFF",12.0f,on?COL_ACTIVE_TEXT:COL_WHITE,true);
+    void RenderTabCheats(float x, float y, float w) {
+        const auto groups = LauncherCheats::Groups();
+        const auto cheats = LauncherCheats::List();
+        if (groups.empty()) {
+            DrawText(x + 16.0f, y + 20.0f, "No cheats available.", 20.0f, COL_WHITE);
+            return;
         }
-        char info[80]; std::snprintf(info,sizeof(info),"Enabled: %zu    Page %d/%d",LauncherCheats::EnabledCount(),m_cheatPage+1,pages);
-        DrawText(x+8.0f,y+304.0f,info,12.0f,COL_MUTED); DrawText(x+w-100.0f,y+304.0f,"<   >",16.0f,COL_WHITE);
+
+        m_cheatGroupIndex = std::clamp(m_cheatGroupIndex, 0, int(groups.size()) - 1);
+        std::string_view group(groups[size_t(m_cheatGroupIndex)]);
+        std::vector<size_t> ids;
+        for (size_t i = 0; i < cheats.size(); ++i)
+            if (cheats[i].group && group == cheats[i].group) ids.push_back(i);
+
+        const int pages = std::max(1, int((ids.size() + 4) / 5));
+        m_cheatPage = std::clamp(m_cheatPage, 0, pages - 1);
+
+        // Give the category and every cheat row enough height for readable text.
+        DrawRoundedRect(x, y, w, 56.0f, 8.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
+        DrawText(x + 14.0f, y + 17.0f, "CATEGORY", 15.0f, COL_MUTED);
+        DrawText(x + 112.0f, y + 15.0f, group.data(), 20.0f, COL_CYAN);
+        DrawText(x + w - 104.0f, y + 15.0f, "<     >", 19.0f, COL_WHITE);
+
+        constexpr float rowTop = 64.0f;
+        constexpr float rowStep = 56.0f;
+        constexpr float rowHeight = 52.0f;
+        for (int row = 0; row < 5; ++row) {
+            const size_t pos = size_t(m_cheatPage * 5 + row);
+            if (pos >= ids.size()) break;
+
+            const size_t idx = ids[pos];
+            const auto& cheat = cheats[idx];
+            const float ry = y + rowTop + float(row) * rowStep;
+            DrawRoundedRect(x, ry, w, rowHeight, 8.0f, COL_PANEL_CARD, COL_PANEL_BORDER);
+            DrawText(x + 14.0f, ry + 5.0f, cheat.name ? cheat.name : "Unnamed", 18.0f, COL_WHITE);
+            if (cheat.detail && cheat.detail[0])
+                DrawText(x + 14.0f, ry + 29.0f, cheat.detail, 13.5f, COL_MUTED);
+
+            const size_t choiceCount = LauncherCheats::Choices(idx);
+            if (choiceCount > 0) {
+                const std::string value = LauncherCheats::ValueLabel(idx);
+                DrawText(x + w - 226.0f, ry + 17.0f, value.c_str(), 15.0f, COL_CYAN);
+                DrawText(x + w - 270.0f, ry + 17.0f, "<", 17.0f, COL_WHITE);
+                DrawText(x + w - 132.0f, ry + 17.0f, ">", 17.0f, COL_WHITE);
+            }
+
+            const bool on = LauncherCheats::Enabled(idx);
+            const float bx = x + w - 86.0f;
+            DrawRoundedRect(bx, ry + 7.0f, 76.0f, 38.0f, 7.0f,
+                            on ? COL_ACTIVE_CHIP : COL_INACTIVE_CHIP,
+                            on ? COL_CYAN : COL_CHIP_BORDER);
+            DrawText(bx + 38.0f, ry + 17.0f, on ? "ON" : "OFF", 16.0f,
+                     on ? COL_ACTIVE_TEXT : COL_WHITE, true);
+        }
+
+        char info[80];
+        std::snprintf(info, sizeof(info), "Enabled: %zu    Page %d/%d",
+                      LauncherCheats::EnabledCount(), m_cheatPage + 1, pages);
+        DrawText(x + 10.0f, y + 354.0f, info, 16.0f, COL_MUTED);
+        DrawText(x + w - 112.0f, y + 350.0f, "<   >", 20.0f, COL_WHITE);
     }
 
     void RenderTabOnline(float x, float y, float w) {
